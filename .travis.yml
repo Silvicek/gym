@@ -2,7 +2,7 @@ dist: trusty
 sudo: required
 cache:
   apt: true
-  pip: true
+  pip: false
 language: python
 addons:
   apt:
