@@ -5,6 +5,8 @@ from gym.utils import colorize, seeding
 import random
 import math
 import numpy as np
+from scipy.ndimage.interpolation import shift
+import copy
 
 import pygame
 from pygame.color import THECOLORS
@@ -64,11 +66,13 @@ class ACar(gym.Env):
 
         # Global-ish.
         self.crashed = False
+        self.success = False
 
         # Physics stuff.
         self.space = pymunk.Space()
         self.space.gravity = pymunk.Vec2d(0., 0.)
         self.space.add_collision_handler(CT_CAR, CT_STATIC, self._crash_handler)
+        self.space.add_collision_handler(CT_CAR, CT_TARGET, self._crash_handler_target)
 
         # Create the car.
         self.car = Shape(self.space, r=30, x=100, y=100, color='green', static=False,
@@ -82,7 +86,7 @@ class ACar(gym.Env):
         # Record steps.
         self.num_steps = 0
 
-        self.last_step = self.car.body.position
+        self.last_position = self.car.body.position
 
         # Create walls.
         static = [
@@ -109,13 +113,21 @@ class ACar(gym.Env):
         # Create some obstacles, semi-randomly.
         # We'll create three and they'll move around to prevent over-fitting.
         self.obstacles = []
-        self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
-        self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
-        self.obstacles.append(Shape(self.space, r=155, x=500, y=150, color='purple'))
-        # self.target = Shape(self.space, r=10, x=600, y=60, color='red', collision_type=CT_TARGET)
+        # self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
+        # self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
+        # self.obstacles.append(Shape(self.space, r=155, x=500, y=150, color='purple'))
+        self.target = Shape(self.space, r=10, x=600, y=60, color='red', collision_type=CT_TARGET)
 
-        self.action_space = spaces.Discrete(3)  # forward, left, right
-        self.observation_space = spaces.Box(low=0, high=100, shape=(3,))
+        self.memory_size = 3
+        self.action_dim = 3
+        self.observation_dim = 3
+        self.state_dim = self.observation_dim + self.memory_size * \
+                        (self.observation_dim + self.action_dim + 1)
+
+        self.action_space = spaces.Discrete(self.action_dim)  # forward, left, right
+        self.observation_space = spaces.Box(low=0, high=100, shape=(self.state_dim,))
+
+        self.full_state = np.zeros(self.state_dim)
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -123,9 +135,16 @@ class ACar(gym.Env):
 
     def _crash_handler(self, space, arbiter):
         self.crashed = True
+        self.success = False
+        return False
+
+    def _crash_handler_target(self, space, arbiter):
+        self.crashed = True
+        self.success = True
         return False
 
     def _step(self, action):
+        self.last_position = copy.copy(self.car.body.position)
         go = 0
         left = 0
         right = 0
@@ -147,6 +166,7 @@ class ACar(gym.Env):
 
         # Update the screen and stuff.
         self.space.step(1. / 10)
+
         self.screen.fill(THECOLORS["black"])
         draw(self.screen, self.space)
         if self.draw_screen:
@@ -168,7 +188,13 @@ class ACar(gym.Env):
 
         r = self.get_reward(action)
 
-        self.last_step = self.car.body.position
+        self.full_state = shift(self.full_state, self.observation_dim)
+        self.full_state[:self.observation_dim] = state
+        state = self.full_state
+
+        self.full_state = shift(self.full_state, self.action_dim+1)
+        self.full_state[0] = r
+        self.full_state[1:self.action_dim+1] = bin_from_int(action, self.action_dim)
 
         return state, r, self.crashed, {}
 
@@ -187,12 +213,16 @@ class ACar(gym.Env):
 
     def get_reward(self, action):
         r = 0
-        if action == 0:
-            r = 0.01
-        # max_dist = np.linalg.norm([width, height])
-        # dist = np.linalg.norm(self.target.body.position - self.car.body.position)
+        max_dist = np.linalg.norm([width, height])
+        dist = np.linalg.norm(self.target.body.position - self.car.body.position)
+        last_dist = np.linalg.norm(self.target.body.position - self.last_position)
         if self.crashed:
-            r = -1.
+            if self.success:
+                r = 1.
+            else:
+                r = -1.
+        else:
+            r = (dist-last_dist)/max_dist*10
         return r
 
     def _move_dynamic(self):
@@ -205,6 +235,7 @@ class ACar(gym.Env):
     def _reset(self):
         self.crashed = False
         self.num_steps = 0
+        self.full_state = np.zeros_like(self.full_state)
         # for shape in self.obstacles + [self.car, self.target] + self.dynamic:
         for shape in self.obstacles + [self.car] + self.dynamic:
             shape.body.position = random.randint(0, width), random.randint(0, height)
@@ -288,6 +319,11 @@ class ACar(gym.Env):
         else:
             return 1
 
+
+def bin_from_int(a, len):
+    x = np.zeros(len)
+    x[a] = 1
+    return x
 
 if __name__=="__main__":
     from pyglet.window import key
