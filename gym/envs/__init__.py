@@ -71,6 +71,12 @@ register(
 )
 
 register(
+    id='ACar-v0',
+    entry_point='gym.envs.classic_control:ACar',
+    timestep_limit=2000,
+)
+
+register(
     id='Acrobot-v0',
     entry_point='gym.envs.classic_control:AcrobotEnv',
     timestep_limit=200,
