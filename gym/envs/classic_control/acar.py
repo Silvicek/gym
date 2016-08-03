@@ -46,16 +46,16 @@ class Shape:
 
 class ACar(gym.Env):
     metadata = {
-        'render.modes': ['human'],
+        'render.modes': ['human', 'rgb_array'],
         'video.frames_per_second': 50
     }
 
     def __init__(self):
-        os.environ["SDL_VIDEODRIVER"] = "dummy"
-        self.show_sensors = False
-        self.draw_screen = False
-        # self.show_sensors = True
-        # self.draw_screen = True
+        # os.environ["SDL_VIDEODRIVER"] = "dummy"
+        # self.show_sensors = False
+        # self.draw_screen = False
+        self.show_sensors = True
+        self.draw_screen = True
 
         pygame.init()
         self.screen = pygame.display.set_mode((width, height))
@@ -209,6 +209,10 @@ class ACar(gym.Env):
 
         arr = None
 
+        if mode == 'rgb_array':
+            screen = pygame.display.get_surface()
+            arr = np.array(screen.get_buffer()).reshape((height, width, -1))
+
         return arr
 
     def get_reward(self, action):
@@ -218,11 +222,11 @@ class ACar(gym.Env):
         last_dist = np.linalg.norm(self.target.body.position - self.last_position)
         if self.crashed:
             if self.success:
-                r = 1.
+                r = 10.
             else:
                 r = -1.
         else:
-            r = (dist-last_dist)/max_dist*10
+            r = (last_dist-dist)/max_dist*10
         return r
 
     def _move_dynamic(self):
@@ -236,8 +240,8 @@ class ACar(gym.Env):
         self.crashed = False
         self.num_steps = 0
         self.full_state = np.zeros_like(self.full_state)
-        # for shape in self.obstacles + [self.car, self.target] + self.dynamic:
-        for shape in self.obstacles + [self.car] + self.dynamic:
+        # for shape in self.obstacles + [self.car] + self.dynamic:
+        for shape in self.obstacles + [self.car, self.target] + self.dynamic:
             shape.body.position = random.randint(0, width), random.randint(0, height)
             shape.body.velocity = Vec2d(0, 0)
             shape.body.angle = random.random() * 2 * np.pi
