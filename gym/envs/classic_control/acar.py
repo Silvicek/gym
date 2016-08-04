@@ -51,12 +51,23 @@ class ACar(gym.Env):
     }
 
     def __init__(self):
-        # os.environ["SDL_VIDEODRIVER"] = "dummy"
-        # self.show_sensors = False
-        # self.draw_screen = False
-        self.show_sensors = True
-        self.draw_screen = True
+        pass
+        # moved to configure - necessary for not drawing a window
 
+    def _seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
+
+    def _configure(self, mode='train'):
+        print 'mode'
+        if mode == 'train':
+            os.environ["SDL_VIDEODRIVER"] = "dummy"
+            self.show_sensors = False
+            self.draw_screen = False
+        else:
+            self.show_sensors = True
+            self.draw_screen = True
+        # __init__()
         pygame.init()
         self.screen = pygame.display.set_mode((width, height))
         self.clock = pygame.time.Clock()
@@ -77,8 +88,6 @@ class ACar(gym.Env):
         # Create the car.
         self.car = Shape(self.space, r=30, x=100, y=100, color='green', static=False,
                          collision_type=CT_CAR)
-        # pivot = pymunk.PivotJoint(self.car.body, self.car.shape, Vec2d.zero(), Vec2d.zero())
-        # self.space.add(pivot)
 
         # self.dynamic = [Shape(self.space, r=30, x=200, y=200, color='orange', static=False)]
         self.dynamic = []
@@ -122,16 +131,12 @@ class ACar(gym.Env):
         self.action_dim = 3
         self.observation_dim = 3
         self.state_dim = self.observation_dim + self.memory_size * \
-                        (self.observation_dim + self.action_dim + 1)
+                                                (self.observation_dim + self.action_dim + 1)
 
         self.action_space = spaces.Discrete(self.action_dim)  # forward, left, right
         self.observation_space = spaces.Box(low=0, high=100, shape=(self.state_dim,))
 
         self.full_state = np.zeros(self.state_dim)
-
-    def _seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
 
     def _crash_handler(self, space, arbiter):
         self.crashed = True
@@ -157,7 +162,7 @@ class ACar(gym.Env):
 
         self.car.body.angle += .2 * (left+right)
 
-        # Move cat.
+        # Move dynamic objects
         if self.num_steps % 5 == 0:
             self._move_dynamic()
 
@@ -202,7 +207,8 @@ class ACar(gym.Env):
         def oob(t, size):
             return t < 0 or t > size
         x, y = self.car.body.position
-        return oob(x, width) or oob(y, height)
+        xt, yt = self.target.body.position
+        return oob(x, width) or oob(y, height) or oob(xt, width) or oob(yt, height)
 
     def _render(self, mode='human', close=False):
         # TODO: this
@@ -226,7 +232,7 @@ class ACar(gym.Env):
             else:
                 r = -1.
         else:
-            r = (last_dist-dist)/max_dist*10
+            r = -0.02 + (last_dist-dist)/max_dist*10
         return r
 
     def _move_dynamic(self):
