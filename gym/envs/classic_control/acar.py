@@ -59,7 +59,6 @@ class ACar(gym.Env):
         return [seed]
 
     def _configure(self, mode='train'):
-        print 'mode'
         if mode == 'train':
             os.environ["SDL_VIDEODRIVER"] = "dummy"
             self.show_sensors = False
@@ -129,7 +128,7 @@ class ACar(gym.Env):
 
         self.memory_size = 3
         self.action_dim = 3
-        self.observation_dim = 3
+        self.observation_dim = 4
         self.state_dim = self.observation_dim + self.memory_size * \
                                                 (self.observation_dim + self.action_dim + 1)
 
@@ -147,6 +146,12 @@ class ACar(gym.Env):
         self.crashed = True
         self.success = True
         return False
+
+    def _get_angle(self):
+        """Angle between car and the target"""
+        xc, yc = self.car.body.position
+        xt, yt = self.target.body.position
+        return norm_pi(np.arctan2(yt-yc, xt-xc) - self.car.body.angle)
 
     def _step(self, action):
         self.last_position = copy.copy(self.car.body.position)
@@ -181,6 +186,7 @@ class ACar(gym.Env):
         # Get the current location and the readings there.
         x, y = self.car.body.position
         readings = self._get_sonar_readings(x, y, self.car.body.angle)
+        readings += [self._get_angle()]
         state = np.array(readings)
         if self.crashed or self._out_of_bounds():
             if self.num_steps == 0:
@@ -334,6 +340,10 @@ def bin_from_int(a, len):
     x = np.zeros(len)
     x[a] = 1
     return x
+
+
+def norm_pi(angle):
+    return angle - 2*np.pi*np.floor((angle + np.pi) / (2*np.pi))
 
 if __name__=="__main__":
     from pyglet.window import key
