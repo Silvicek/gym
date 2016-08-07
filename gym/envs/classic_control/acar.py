@@ -121,8 +121,8 @@ class ACar(gym.Env):
         # Create some obstacles, semi-randomly.
         # We'll create three and they'll move around to prevent over-fitting.
         self.obstacles = []
-        # self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
-        # self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
+        self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
+        self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
         # self.obstacles.append(Shape(self.space, r=155, x=500, y=150, color='purple'))
         self.target = Shape(self.space, r=10, x=600, y=60, color='red', collision_type=CT_TARGET)
 
@@ -136,22 +136,6 @@ class ACar(gym.Env):
         self.observation_space = spaces.Box(low=0, high=100, shape=(self.state_dim,))
 
         self.full_state = np.zeros(self.state_dim)
-
-    def _crash_handler(self, space, arbiter):
-        self.crashed = True
-        self.success = False
-        return False
-
-    def _crash_handler_target(self, space, arbiter):
-        self.crashed = True
-        self.success = True
-        return False
-
-    def _get_angle(self):
-        """Angle between car and the target"""
-        xc, yc = self.car.body.position
-        xt, yt = self.target.body.position
-        return norm_pi(np.arctan2(yt-yc, xt-xc) - self.car.body.angle)
 
     def _step(self, action):
         self.last_position = copy.copy(self.car.body.position)
@@ -208,6 +192,22 @@ class ACar(gym.Env):
         self.full_state[1:self.action_dim+1] = bin_from_int(action, self.action_dim)
 
         return state, r, self.crashed, {}
+
+    def _crash_handler(self, space, arbiter):
+        self.crashed = True
+        self.success = False
+        return False
+
+    def _crash_handler_target(self, space, arbiter):
+        self.crashed = True
+        self.success = True
+        return False
+
+    def _get_angle(self):
+        """Angle between car and the target"""
+        xc, yc = self.car.body.position
+        xt, yt = self.target.body.position
+        return norm_pi(np.arctan2(yt - yc, xt - xc) - self.car.body.angle)
 
     def _out_of_bounds(self):
         def oob(t, size):
