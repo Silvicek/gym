@@ -121,8 +121,8 @@ class ACar(gym.Env):
         # Create some obstacles, semi-randomly.
         # We'll create three and they'll move around to prevent over-fitting.
         self.obstacles = []
-        self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
-        self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
+        # self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
+        # self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
         # self.obstacles.append(Shape(self.space, r=155, x=500, y=150, color='purple'))
         self.target = Shape(self.space, r=10, x=600, y=60, color='red', collision_type=CT_TARGET)
 
@@ -193,6 +193,18 @@ class ACar(gym.Env):
 
         return state, r, self.crashed, {}
 
+    def _reset(self):
+        self.crashed = False
+        self.num_steps = 0
+        self.full_state = np.zeros_like(self.full_state)
+
+        for shape in self.obstacles + [self.car, self.target] + self.dynamic:
+            shape.body.position = random.randint(0, width), random.randint(0, height)
+            shape.body.velocity = Vec2d(0, 0)
+            shape.body.angle = random.random() * 2 * np.pi
+
+        return self._step(None)[0]
+
     def _crash_handler(self, space, arbiter):
         self.crashed = True
         self.success = False
@@ -207,7 +219,10 @@ class ACar(gym.Env):
         """Angle between car and the target"""
         xc, yc = self.car.body.position
         xt, yt = self.target.body.position
-        return norm_pi(np.arctan2(yt - yc, xt - xc) - self.car.body.angle)
+        angle = norm_pi(np.arctan2(yt - yc, xt - xc) - self.car.body.angle)  # [-pi,pi]
+        if abs(angle) > np.pi/4:
+            return 10.
+        return angle
 
     def _out_of_bounds(self):
         def oob(t, size):
@@ -247,18 +262,6 @@ class ACar(gym.Env):
             obj.body.angle -= random.randint(-1, 1)
             direction = Vec2d(1, 0).rotated(obj.body.angle)
             obj.body.velocity = speed * direction
-
-    def _reset(self):
-        self.crashed = False
-        self.num_steps = 0
-        self.full_state = np.zeros_like(self.full_state)
-        # for shape in self.obstacles + [self.car] + self.dynamic:
-        for shape in self.obstacles + [self.car, self.target] + self.dynamic:
-            shape.body.position = random.randint(0, width), random.randint(0, height)
-            shape.body.velocity = Vec2d(0, 0)
-            shape.body.angle = random.random() * 2 * np.pi
-
-        return self._step(None)[0]
 
     def _get_sonar_readings(self, x, y, angle):
         readings = []
