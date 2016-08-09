@@ -58,8 +58,11 @@ class ACar(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def _configure(self, mode='train'):
-        if mode == 'train':
+    def _configure(self, args=None):
+        self.memory_steps = args.memory_steps
+        self.action_dim = 3
+        self.observation_dim = 4
+        if args.mode == 'train':
             os.environ["SDL_VIDEODRIVER"] = "dummy"
             self.show_sensors = False
             self.draw_screen = False
@@ -121,15 +124,12 @@ class ACar(gym.Env):
         # Create some obstacles, semi-randomly.
         # We'll create three and they'll move around to prevent over-fitting.
         self.obstacles = []
-        # self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
-        # self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
+        self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
+        self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
         # self.obstacles.append(Shape(self.space, r=155, x=500, y=150, color='purple'))
         self.target = Shape(self.space, r=10, x=600, y=60, color='red', collision_type=CT_TARGET)
 
-        self.memory_size = 3
-        self.action_dim = 3
-        self.observation_dim = 4
-        self.state_dim = self.observation_dim + self.memory_size * \
+        self.state_dim = self.observation_dim + self.memory_steps * \
                                                 (self.observation_dim + self.action_dim + 1)
 
         self.action_space = spaces.Discrete(self.action_dim)  # forward, left, right
@@ -203,6 +203,14 @@ class ACar(gym.Env):
             shape.body.velocity = Vec2d(0, 0)
             shape.body.angle = random.random() * 2 * np.pi
 
+        # self.car.body.position = 100, 100
+        # self.car.body.velocity = Vec2d(0, 0)
+        # self.car.body.angle = 0
+        #
+        # self.target.body.position = 500, 500
+        # self.target.body.velocity = Vec2d(0, 0)
+        # self.target.angle = 0
+
         return self._step(None)[0]
 
     def _crash_handler(self, space, arbiter):
@@ -251,9 +259,9 @@ class ACar(gym.Env):
             if self.success:
                 r = 10.
             else:
-                r = -1.
+                r = -2.
         else:
-            r = -0.02 + (last_dist-dist)/max_dist*10
+            r = -0.1 + (last_dist-dist)/max_dist*10
         return r
 
     def _move_dynamic(self):
