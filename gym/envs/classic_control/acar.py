@@ -259,7 +259,7 @@ class ACar(gym.Env):
             if self.success:
                 r = 10.
             else:
-                r = -2.
+                r = -10.
         else:
             r = -0.1 + (last_dist-dist)/max_dist*10
         return r
