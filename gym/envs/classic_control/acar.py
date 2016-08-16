@@ -2,7 +2,6 @@ import gym
 from gym import spaces
 from gym.utils import colorize, seeding
 
-import random
 import math
 import numpy as np
 from scipy.ndimage.interpolation import shift
@@ -126,7 +125,6 @@ class ACar(gym.Env):
         self.obstacles = []
         self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
         self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
-        # self.obstacles.append(Shape(self.space, r=155, x=500, y=150, color='purple'))
         self.target = Shape(self.space, r=10, x=600, y=60, color='red', collision_type=CT_TARGET)
 
         self.state_dim = self.observation_dim + self.memory_steps * \
@@ -182,15 +180,12 @@ class ACar(gym.Env):
         self.num_steps += 1
 
         r = self.get_reward(action)
-
         self.full_state = shift(self.full_state, self.observation_dim)
         self.full_state[:self.observation_dim] = state
         state = self.full_state
-
         self.full_state = shift(self.full_state, self.action_dim+1)
-        self.full_state[0] = r
+        self.full_state[0] = np.linalg.norm(self.target.body.position - self.car.body.position)
         self.full_state[1:self.action_dim+1] = bin_from_int(action, self.action_dim)
-
         return state, r, self.crashed, {}
 
     def _reset(self):
@@ -198,10 +193,25 @@ class ACar(gym.Env):
         self.num_steps = 0
         self.full_state = np.zeros_like(self.full_state)
 
+        placed = []
+
         for shape in self.obstacles + [self.car, self.target] + self.dynamic:
-            shape.body.position = random.randint(0, width), random.randint(0, height)
             shape.body.velocity = Vec2d(0, 0)
-            shape.body.angle = random.random() * 2 * np.pi
+            shape.body.angle = np.random.random() * 2 * np.pi
+            while True:
+                shape.body.position = np.random.randint(0, width), np.random.randint(0, height)
+                ok = True
+                for x in placed:
+                    if np.linalg.norm(shape.body.position - x.body.position) - \
+                       (shape.shape.radius + x.shape.radius) < 0:
+                        ok = False
+                if ok:
+                    break
+            placed.append(shape)
+
+
+
+
 
         # self.car.body.position = 100, 100
         # self.car.body.velocity = Vec2d(0, 0)
@@ -228,8 +238,8 @@ class ACar(gym.Env):
         xc, yc = self.car.body.position
         xt, yt = self.target.body.position
         angle = norm_pi(np.arctan2(yt - yc, xt - xc) - self.car.body.angle)  # [-pi,pi]
-        if abs(angle) > np.pi/4:
-            return 10.
+        # if abs(angle) > np.pi/2:
+        #     return 10.
         return angle
 
     def _out_of_bounds(self):
@@ -257,7 +267,7 @@ class ACar(gym.Env):
         last_dist = np.linalg.norm(self.target.body.position - self.last_position)
         if self.crashed:
             if self.success:
-                r = 10.
+                r = 100.
             else:
                 r = -10.
         else:
@@ -266,8 +276,8 @@ class ACar(gym.Env):
 
     def _move_dynamic(self):
         for obj in self.dynamic:
-            speed = random.randint(20, 100)
-            obj.body.angle -= random.randint(-1, 1)
+            speed = np.random.randint(20, 100)
+            obj.body.angle -= np.random.randint(-1, 1)
             direction = Vec2d(1, 0).rotated(obj.body.angle)
             obj.body.velocity = speed * direction
 
