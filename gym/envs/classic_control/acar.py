@@ -60,7 +60,8 @@ class ACar(gym.Env):
     def _configure(self, args=None):
         self.memory_steps = args.memory_steps
         self.action_dim = 3
-        self.observation_dim = 4
+        self.sensor_dim = 5
+        self.observation_dim = self.sensor_dim + 1
         if args.mode == 'train':
             os.environ["SDL_VIDEODRIVER"] = "dummy"
             self.show_sensors = False
@@ -123,8 +124,8 @@ class ACar(gym.Env):
         # Create some obstacles, semi-randomly.
         # We'll create three and they'll move around to prevent over-fitting.
         self.obstacles = []
-        self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
-        self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
+        # self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
+        # self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
         self.target = Shape(self.space, r=10, x=600, y=60, color='red', collision_type=CT_TARGET)
 
         self.state_dim = self.observation_dim + self.memory_steps * \
@@ -179,10 +180,10 @@ class ACar(gym.Env):
 
         self.num_steps += 1
 
-        r = self.get_reward(action)
         self.full_state = shift(self.full_state, self.observation_dim)
         self.full_state[:self.observation_dim] = state
         state = self.full_state
+        r = self.get_reward(action)
         self.full_state = shift(self.full_state, self.action_dim+1)
         self.full_state[0] = np.linalg.norm(self.target.body.position - self.car.body.position)
         self.full_state[1:self.action_dim+1] = bin_from_int(action, self.action_dim)
@@ -193,35 +194,36 @@ class ACar(gym.Env):
         self.num_steps = 0
         self.full_state = np.zeros_like(self.full_state)
 
-        placed = []
+        self.car.body.velocity = Vec2d(0, 0)
+        # self.car.body.angle = np.random.random() * 2 * np.pi
+        self.car.body.angle = 0.5
+        self.car.body.position = 50,50
 
-        for shape in self.obstacles + [self.car, self.target] + self.dynamic:
-            shape.body.velocity = Vec2d(0, 0)
-            shape.body.angle = np.random.random() * 2 * np.pi
-            while True:
-                shape.body.position = np.random.randint(0, width), np.random.randint(0, height)
-                ok = True
-                for x in placed:
-                    if np.linalg.norm(shape.body.position - x.body.position) - \
-                       (shape.shape.radius + x.shape.radius) < 0:
-                        ok = False
-                if ok:
-                    break
-            placed.append(shape)
+        self.target.body.position = 900, 650
 
+        # for shape in [self.car, self.target]:
+        #     shape.body.velocity = Vec2d(0, 0)
+        #     shape.body.angle = np.random.random() * 2 * np.pi
+        #     shape.body.position = np.random.randint(0, width), np.random.randint(0, height)
 
-
-
-
-        # self.car.body.position = 100, 100
-        # self.car.body.velocity = Vec2d(0, 0)
-        # self.car.body.angle = 0
-        #
-        # self.target.body.position = 500, 500
-        # self.target.body.velocity = Vec2d(0, 0)
-        # self.target.angle = 0
+        # self.obstacles[0].body.position = self._obs_between()
 
         return self._step(None)[0]
+
+    def _obs_between(self):
+        """y=ax+b"""
+        x1, y1 = self.car.body.position
+        x2, y2 = self.target.body.position
+
+        if x1 == x2:
+            return x1, y1+np.random.random()*(y2-y1)
+
+        a = (y2-y1)/(x2-x1)
+        b = y1-a*x1
+        # x3 = x1+np.random.random()*(x2-x1)
+        x3 = x1+0.5*(x2-x1)
+        y3 = a*x3+b
+        return x3, y3
 
     def _crash_handler(self, space, arbiter):
         self.crashed = True
@@ -261,7 +263,7 @@ class ACar(gym.Env):
         return arr
 
     def get_reward(self, action):
-        r = 0
+        r = .0
         max_dist = np.linalg.norm([width, height])
         dist = np.linalg.norm(self.target.body.position - self.car.body.position)
         last_dist = np.linalg.norm(self.target.body.position - self.last_position)
@@ -271,7 +273,11 @@ class ACar(gym.Env):
             else:
                 r = -10.
         else:
+            d = (40. - np.max(self.full_state[:3]))/400.
             r = -0.1 + (last_dist-dist)/max_dist*10
+            # r = -0.1 + (last_dist-dist)/max_dist*10 - d
+            # r = (last_dist-dist)/max_dist*10
+            # r = 0.
         return r
 
     def _move_dynamic(self):
@@ -284,14 +290,13 @@ class ACar(gym.Env):
     def _get_sonar_readings(self, x, y, angle):
         readings = []
         # Make our arms.
-        arm_left = self._make_sonar_arm(x, y)
-        arm_middle = arm_left
-        arm_right = arm_left
+        arm = self._make_sonar_arm(x, y)
 
         # Rotate them and get readings.
-        readings.append(self._get_arm_distance(arm_left, x, y, angle, 0.75))
-        readings.append(self._get_arm_distance(arm_middle, x, y, angle, 0))
-        readings.append(self._get_arm_distance(arm_right, x, y, angle, -0.75))
+        max_angle = 1.
+        for i in range(self.sensor_dim):
+            offset = -max_angle + 2*max_angle/self.sensor_dim * i
+            readings.append(self._get_arm_distance(arm, x, y, angle, offset))
 
         if self.show_sensors:
             pygame.display.update()
