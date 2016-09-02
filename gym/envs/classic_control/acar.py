@@ -61,7 +61,7 @@ class ACar(gym.Env):
         self.memory_steps = args.memory_steps
         self.action_dim = 3
         self.observation_dim = 4
-        if args.mode == 'train':
+        if args.mode == 'train' or args.mode == 'play2':
             os.environ["SDL_VIDEODRIVER"] = "dummy"
             self.show_sensors = False
             self.draw_screen = False
@@ -125,7 +125,7 @@ class ACar(gym.Env):
         self.obstacles = []
         self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
         self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
-        self.target = Shape(self.space, r=10, x=600, y=60, color='red', collision_type=CT_TARGET)
+        self.target = Shape(self.space, r=10, x=600, y=60, color='orange', collision_type=CT_TARGET)
 
         self.state_dim = self.observation_dim + self.memory_steps * \
                                                 (self.observation_dim + self.action_dim + 1)
@@ -208,10 +208,6 @@ class ACar(gym.Env):
                 if ok:
                     break
             placed.append(shape)
-
-
-
-
 
         # self.car.body.position = 100, 100
         # self.car.body.velocity = Vec2d(0, 0)
@@ -351,7 +347,7 @@ class ACar(gym.Env):
 
     def _is_empty(self, reading):  # TODO: fix this stupid color-check
         if reading == THECOLORS['black'] or reading == THECOLORS['green'] \
-                or reading == THECOLORS['blue']:
+                or reading == THECOLORS['blue'] or reading == THECOLORS['orange']:
             return 0
         else:
             return 1
