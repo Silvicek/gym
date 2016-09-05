@@ -61,7 +61,7 @@ class ACar(gym.Env):
         self.memory_steps = args.memory_steps
         self.action_dim = 3
         self.observation_dim = 4
-        if args.mode == 'train' or args.mode == 'play2':
+        if args.mode == 'train' or args.mode == 'test':
             os.environ["SDL_VIDEODRIVER"] = "dummy"
             self.show_sensors = False
             self.draw_screen = False
@@ -89,6 +89,9 @@ class ACar(gym.Env):
         # Create the car.
         self.car = Shape(self.space, r=30, x=100, y=100, color='green', static=False,
                          collision_type=CT_CAR)
+
+        self.car_joint = pymunk.PivotJoint(self.car.body, self.car.body, (0,0), (0,0))
+        self.space.add(self.car_joint)
 
         # self.dynamic = [Shape(self.space, r=30, x=200, y=200, color='orange', static=False)]
         self.dynamic = []
@@ -147,14 +150,16 @@ class ACar(gym.Env):
         elif action == 2:
             right = -1
 
-        self.car.body.angle += .2 * (left+right)
+        # self.car.body.angle += .2 * (left+right)
+        self.car.body.apply_impulse(self.car.body.angle)
+        # self.car.body.apply_force(.1)
 
         # Move dynamic objects
         if self.num_steps % 5 == 0:
             self._move_dynamic()
 
         driving_direction = Vec2d(1, 0).rotated(self.car.body.angle)
-        self.car.body.velocity = int(100 * go) * driving_direction
+        # self.car.body.velocity = int(100 * go) * driving_direction
 
         # Update the screen and stuff.
         self.space.step(1. / 10)
@@ -362,6 +367,13 @@ def bin_from_int(a, len):
 def norm_pi(angle):
     return angle - 2*np.pi*np.floor((angle + np.pi) / (2*np.pi))
 
+
+class Args:
+    def __init__(self):
+        self.mode = 'play'
+        self.memory_steps = 0
+
+
 if __name__=="__main__":
     from pyglet.window import key
     a = np.array( [1.0, 0.0, 0.0] )
@@ -378,6 +390,7 @@ if __name__=="__main__":
         if k==key.UP:    a[1] = 0
         if k==key.DOWN:  a[2] = 0
     env = ACar()
+    env.configure(Args())
     env.render()
     record_video = False
     if record_video:
@@ -388,10 +401,10 @@ if __name__=="__main__":
         steps = 0
         restart = False
         while True:
+            a = env.action_space.sample()
             s, r, done, info = env.step(a)
             total_reward += r
             if steps % 200 == 0 or done:
-                print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
                 print("step {} total_reward {:+0.2f}".format(steps, total_reward))
                 #import matplotlib.pyplot as plt
                 #plt.imshow(s)
