@@ -37,10 +37,35 @@ class Shape:
         self.body.position = x, y
         self.shape = pymunk.Circle(self.body, r)
         self.shape.color = THECOLORS[color]
-        self.shape.elasticity = 1.0
+        # self.shape.elasticity = 1.0
         self.shape.angle = angle
         self.shape.collision_type = collision_type
         space.add(self.body, self.shape)
+
+def make_car(space):
+    r = 30
+    x = 100
+    y = 100
+    color = 'green'
+    collision_type = CT_CAR
+    car_body = pymunk.Body(1, pymunk.inf)
+    car_body.position = (x,y)
+
+    car_shape = pymunk.Circle(car_body, r)
+    car_shape.friction = 0.1
+    car_shape.color = THECOLORS[color]
+
+    target_body = pymunk.Body(pymunk.inf, pymunk.inf)
+    target_body.position = (x,y)
+
+    car_joint = pymunk.PivotJoint(car_body, target_body, (0, 0), (0, 0))
+    car_joint.max_bias = 200.
+    car_joint.max_force = 3000.
+    space.add(car_body, car_shape, target_body, car_joint)
+
+    return car_body
+
+
 
 
 class ACar(gym.Env):
@@ -89,9 +114,8 @@ class ACar(gym.Env):
         # Create the car.
         self.car = Shape(self.space, r=30, x=100, y=100, color='green', static=False,
                          collision_type=CT_CAR)
-
-        self.car_joint = pymunk.PivotJoint(self.car.body, self.car.body, (0,0), (0,0))
-        self.space.add(self.car_joint)
+        self.car.shape.friction = 0.1
+        # self.car = make_car(self.space)
 
         # self.dynamic = [Shape(self.space, r=30, x=200, y=200, color='orange', static=False)]
         self.dynamic = []
@@ -150,16 +174,17 @@ class ACar(gym.Env):
         elif action == 2:
             right = -1
 
-        # self.car.body.angle += .2 * (left+right)
-        self.car.body.apply_impulse(self.car.body.angle)
-        # self.car.body.apply_force(.1)
+        self.car.body.angle += .2 * (left+right)
+        # driving_direction = Vec2d(1, 0).rotated(self.car.body.angle)
+        # self.car.body.apply_impulse(driving_direction)
+        # self.car.body.apply_force(driving_direction)
 
         # Move dynamic objects
         if self.num_steps % 5 == 0:
             self._move_dynamic()
 
         driving_direction = Vec2d(1, 0).rotated(self.car.body.angle)
-        # self.car.body.velocity = int(100 * go) * driving_direction
+        self.car.body.velocity = int(100 * go) * driving_direction
 
         # Update the screen and stuff.
         self.space.step(1. / 10)
@@ -191,7 +216,8 @@ class ACar(gym.Env):
         self.full_state = shift(self.full_state, self.action_dim+1)
         self.full_state[0] = np.linalg.norm(self.target.body.position - self.car.body.position)
         self.full_state[1:self.action_dim+1] = bin_from_int(action, self.action_dim)
-        return state, r, self.crashed, {}
+        done = self.crashed and self.success
+        return state, r, done, {}
 
     def _reset(self):
         self.crashed = False
@@ -227,7 +253,7 @@ class ACar(gym.Env):
     def _crash_handler(self, space, arbiter):
         self.crashed = True
         self.success = False
-        return False
+        return True
 
     def _crash_handler_target(self, space, arbiter):
         self.crashed = True
@@ -270,7 +296,7 @@ class ACar(gym.Env):
             if self.success:
                 r = 100.
             else:
-                r = -10.
+                r = -1.
         else:
             r = -0.1 + (last_dist-dist)/max_dist*10
         return r
@@ -376,6 +402,7 @@ class Args:
 
 if __name__=="__main__":
     from pyglet.window import key
+    import time
     a = np.array( [1.0, 0.0, 0.0] )
     def key_press(k, mod):
         global restart
@@ -403,6 +430,7 @@ if __name__=="__main__":
         while True:
             a = env.action_space.sample()
             s, r, done, info = env.step(a)
+            time.sleep(0.01)
             total_reward += r
             if steps % 200 == 0 or done:
                 print("step {} total_reward {:+0.2f}".format(steps, total_reward))
