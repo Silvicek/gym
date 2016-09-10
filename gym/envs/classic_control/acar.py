@@ -60,8 +60,8 @@ class ACar(gym.Env):
     def _configure(self, args=None):
         self.memory_steps = args.memory_steps
         self.action_dim = 3
-        self.observation_dim = 4
-        if args.mode == 'train' or args.mode == 'play2':
+        self.observation_dim = 5
+        if args.mode == 'train' or args.mode == 'test':
             os.environ["SDL_VIDEODRIVER"] = "dummy"
             self.show_sensors = False
             self.draw_screen = False
@@ -128,7 +128,7 @@ class ACar(gym.Env):
         self.target = Shape(self.space, r=10, x=600, y=60, color='orange', collision_type=CT_TARGET)
 
         self.state_dim = self.observation_dim + self.memory_steps * \
-                                                (self.observation_dim + self.action_dim + 1)
+                                                (self.observation_dim + self.action_dim)
 
         self.action_space = spaces.Discrete(self.action_dim)  # forward, left, right
         self.observation_space = spaces.Box(low=0, high=100, shape=(self.state_dim,))
@@ -146,6 +146,8 @@ class ACar(gym.Env):
             left = 1
         elif action == 2:
             right = -1
+        # elif action == 3:
+        #     go = -1
 
         self.car.body.angle += .2 * (left+right)
 
@@ -167,9 +169,18 @@ class ACar(gym.Env):
 
         # Get the current location and the readings there.
         x, y = self.car.body.position
+        xt, yt = self.target.body.position
+
         readings = self._get_sonar_readings(x, y, self.car.body.angle)
-        readings += [self._get_angle()]
+        distance = np.sqrt((x-xt)**2+(y-yt)**2)
+        # print np.array(self.car.body.position), np.array(self.target.body.position)
+
+        readings += [self._get_angle(), distance]
+        # print self.target.body.position
+        # print self.car.body.position
+        # print readings, np.linalg.norm(self.target.body.position - self.car.body.position)
         state = np.array(readings)
+
         if self.crashed or self._out_of_bounds():
             if self.num_steps == 0:
                 self.reset()
@@ -180,12 +191,16 @@ class ACar(gym.Env):
         self.num_steps += 1
 
         r = self.get_reward(action)
-        self.full_state = shift(self.full_state, self.observation_dim)
-        self.full_state[:self.observation_dim] = state
-        state = self.full_state
-        self.full_state = shift(self.full_state, self.action_dim+1)
-        self.full_state[0] = np.linalg.norm(self.target.body.position - self.car.body.position)
-        self.full_state[1:self.action_dim+1] = bin_from_int(action, self.action_dim)
+
+        if self.memory_steps > 0:
+            self.full_state = shift(self.full_state, self.action_dim+self.observation_dim)
+            self.full_state[self.observation_dim:self.observation_dim+self.action_dim+1] = bin_from_int(action, self.action_dim)
+            self.full_state[:self.observation_dim] = state
+            state = self.full_state
+        else:
+            self.full_state = state
+
+        # print state
         return state, r, self.crashed, {}
 
     def _reset(self):
@@ -355,7 +370,8 @@ class ACar(gym.Env):
 
 def bin_from_int(a, len):
     x = np.zeros(len)
-    x[a] = 1
+    if a is not None:
+        x[a] = 1
     return x
 
 
