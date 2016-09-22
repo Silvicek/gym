@@ -215,7 +215,7 @@ class ACar(gym.Env):
                 shape.body.position = np.random.randint(0, width), np.random.randint(0, height)
                 ok = True
                 for x in placed:
-                    if np.linalg.norm(shape.body.position - x.body.position) - \
+                    if dist(shape.body.position, x.body.position) - \
                        (shape.shape.radius + x.shape.radius) < 0:
                         ok = False
                 if ok:
@@ -271,16 +271,16 @@ class ACar(gym.Env):
 
     def get_reward(self, action):
         r = 0
-        max_dist = np.linalg.norm([width, height])
-        dist = np.linalg.norm(self.target.body.position - self.car.body.position)
-        last_dist = np.linalg.norm(self.target.body.position - self.last_position)
+        max_distance = dist((width, height), (0., 0.))
+        distance = dist(self.target.body.position, self.car.body.position)
+        last_distance = dist(self.target.body.position, self.last_position)
         if self.crashed:
             if self.success:
                 r = 100.
             else:
                 r = -10.
         else:
-            r = -0.1 + (last_dist-dist)/max_dist*10
+            r = -0.1 + (last_distance-distance)/max_distance*10
         return r
 
     def _move_dynamic(self):
@@ -371,6 +371,12 @@ def bin_from_int(a, len):
     if a is not None:
         x[a] = 1
     return x
+
+
+def dist(a, b):
+    (x1, y1) = a
+    (x2, y2) = b
+    return (x1 - x2)**2 + (y1 - y2)**2
 
 
 def norm_pi(angle):
