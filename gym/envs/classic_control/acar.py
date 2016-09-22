@@ -15,6 +15,8 @@ from pymunk.vec2d import Vec2d
 from pymunk.pygame_util import draw
 import os
 
+from pathfinding import Trajectory, dist
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -135,6 +137,8 @@ class ACar(gym.Env):
         self.observation_space = spaces.Box(low=0, high=100, shape=(self.state_dim,))
 
         self.full_state = np.zeros(self.state_dim)
+        self.counter = 0
+        self.trajectory = []
 
     def _step(self, action):
         self.last_position = copy.copy(self.car.body.position)
@@ -164,6 +168,10 @@ class ACar(gym.Env):
 
         self.screen.fill(THECOLORS["black"])
         draw(self.screen, self.space)
+        # for point in self.trajectory.trajectory:
+        #     xc, yc = tup_to_int(point)
+        #     self.screen.set_at((xc, yc), (255, 255, 255))
+
         if self.draw_screen:
             pygame.display.flip()
         self.clock.tick()
@@ -199,6 +207,10 @@ class ACar(gym.Env):
 
         self.old_action = action
 
+        # print state
+        # import time
+        # time.sleep(.5)
+
         return state, r, self.crashed, {}
 
     def _reset(self):
@@ -222,13 +234,19 @@ class ACar(gym.Env):
                     break
             placed.append(shape)
 
-        # self.car.body.position = 100, 100
-        # self.car.body.velocity = Vec2d(0, 0)
-        # self.car.body.angle = 0
-        #
-        # self.target.body.position = 500, 500
-        # self.target.body.velocity = Vec2d(0, 0)
-        # self.target.angle = 0
+        self.screen.fill(THECOLORS["black"])
+        draw(self.screen, self.space)
+        self.counter = 0
+        self.trajectory = Trajectory(flip_y(self.car.body.position), flip_y(self.target.body.position), self._is_empty)
+        for point in self.trajectory.trajectory:
+            xc, yc = tup_to_int(point)
+            self.screen.set_at((xc, yc), (255, 255, 255))
+
+        # for x in [self.car, self.target] + self.obstacles:
+        #     pygame.draw.circle(self.screen, (255, 255, 255), tup_to_int(x.body.position), 10)
+
+        if self.draw_screen:
+            pygame.display.flip()
 
         return self._step(None)[0]
 
@@ -274,13 +292,15 @@ class ACar(gym.Env):
         max_distance = dist((width, height), (0., 0.))
         distance = dist(self.target.body.position, self.car.body.position)
         last_distance = dist(self.target.body.position, self.last_position)
+        t_distance = self.trajectory.distance(self.car.body.position)
         if self.crashed:
             if self.success:
                 r = 100.
             else:
                 r = -10.
         else:
-            r = -0.1 + (last_distance-distance)/max_distance*10
+            # r = -0.1 + (last_distance-distance)/max_distance*10
+            r = -0.1 + (last_distance-distance)/max_distance*10 - t_distance/max_distance*10
         return r
 
     def _move_dynamic(self):
@@ -382,22 +402,26 @@ def dist(a, b):
 def norm_pi(angle):
     return angle - 2*np.pi*np.floor((angle + np.pi) / (2*np.pi))
 
+class Args:
+    def __init__(self):
+        self.mode = 'play'
+        self.memory_steps = 0
+
+
+def tup_to_int(x):
+    return (int(x[0]), int(x[1]))
+
+
+def flip_y(x):
+    return x[0], height-x[1]
+
+
 if __name__=="__main__":
-    from pyglet.window import key
+    import time
+    np.random.seed(1337)
     a = np.array( [1.0, 0.0, 0.0] )
-    def key_press(k, mod):
-        global restart
-        if k==0xff0d: restart = True
-        if k==key.LEFT:  a[0] = -1.0
-        if k==key.RIGHT: a[0] = +1.0
-        if k==key.UP:    a[1] = +1.0
-        if k==key.DOWN:  a[2] = +0.8   # set 1.0 for wheels to block to zero rotation
-    def key_release(k, mod):
-        if k==key.LEFT  and a[0]==-1.0: a[0] = 0
-        if k==key.RIGHT and a[0]==+1.0: a[0] = 0
-        if k==key.UP:    a[1] = 0
-        if k==key.DOWN:  a[2] = 0
     env = ACar()
+    env.configure(Args())
     env.render()
     record_video = False
     if record_video:
@@ -408,10 +432,11 @@ if __name__=="__main__":
         steps = 0
         restart = False
         while True:
+            a = env.action_space.sample()
             s, r, done, info = env.step(a)
+            time.sleep(0.01)
             total_reward += r
             if steps % 200 == 0 or done:
-                print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
                 print("step {} total_reward {:+0.2f}".format(steps, total_reward))
                 #import matplotlib.pyplot as plt
                 #plt.imshow(s)
