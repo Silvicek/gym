@@ -376,7 +376,7 @@ def bin_from_int(a, len):
 def dist(a, b):
     (x1, y1) = a
     (x2, y2) = b
-    return (x1 - x2)**2 + (y1 - y2)**2
+    return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
 
 def norm_pi(angle):
