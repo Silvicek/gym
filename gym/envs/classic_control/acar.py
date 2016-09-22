@@ -36,7 +36,7 @@ class Shape:
             self.body = pymunk.Body(pymunk.inf, pymunk.inf)
         else:
             self.body = pymunk.Body(1, 1./2.*r**2)
-        self.p = x, y
+        self.set_position((x, y))
         self.shape = pymunk.Circle(self.body, r)
         self.shape.color = THECOLORS[color]
         self.shape.elasticity = 1.0
@@ -45,12 +45,10 @@ class Shape:
         space.add(self.body, self.shape)
 
     def set_position(self, p):
-        self.p = p
-        # self.body.position = p[0], height-p[1]
-        self.body.position = p
+        self.body.position = p[0], height-p[1]
 
     def get_position(self):
-        return self.p
+        return self.body.position[0], height - self.body.position[1]
 
 
 
@@ -147,7 +145,7 @@ class ACar(gym.Env):
 
         self.full_state = np.zeros(self.state_dim)
         self.counter = 0
-        # self.trajectory = Trajectory(self.car.get_position(), self.target.get_position(), self._is_empty).trajectory
+        self.trajectory = Trajectory(self.car.get_position(), self.target.get_position(), self._is_empty)
 
     def _step(self, action):
         self.last_position = copy.copy(self.car.get_position())
@@ -180,9 +178,9 @@ class ACar(gym.Env):
 
 
         draw(self.screen, self.space)
-        # for point in self.trajectory:
-        #     xc, yc = tup_to_int(point)
-        #     self.screen.set_at((xc, yc), (255, 255, 255))
+        for point in self.trajectory.trajectory:
+            xc, yc = tup_to_int(point)
+            self.screen.set_at((xc, yc), (255, 255, 255))
 
         xc, yc = tup_to_int(self.car.get_position())
 
@@ -197,7 +195,7 @@ class ACar(gym.Env):
         x, y = self.car.get_position()
         xt, yt = self.target.get_position()
 
-        readings = self._get_sonar_readings(x, y, self.car.body.angle)
+        readings = self._get_sonar_readings(x, height-y, self.car.body.angle)
         distance = dist(self.car.get_position(), self.target.get_position())/100.
         readings += [self._get_angle(), distance]
         state = np.array(readings)
@@ -224,6 +222,10 @@ class ACar(gym.Env):
 
         self.old_action = action
 
+        print state
+        import time
+        time.sleep(5)
+
         return state, r, self.crashed, {}
 
     def _reset(self):
@@ -249,21 +251,17 @@ class ACar(gym.Env):
 
         self.screen.fill(THECOLORS["black"])
         draw(self.screen, self.space)
-        # self.trajectory = Trajectory(self.car.get_position(), self.target.get_position(), self._is_empty).trajectory
-        # for point in self.trajectory:
-        #     xc, yc = tup_to_int(point)
-        #     self.screen.set_at((xc, yc), (255, 255, 255))
+        self.counter = 0
+        self.trajectory = Trajectory(self.car.get_position(), self.target.get_position(), self._is_empty)
+        for point in self.trajectory.trajectory:
+            xc, yc = tup_to_int(point)
+            self.screen.set_at((xc, yc), (255, 255, 255))
 
-        # for x in [self.car, self.target] + self.obstacles:
-        #     pygame.draw.circle(self.screen, (255, 255, 255), tup_to_int(x.get_position()), 10)
+        for x in [self.car, self.target] + self.obstacles:
+            pygame.draw.circle(self.screen, (255, 255, 255), tup_to_int(x.get_position()), 10)
 
         if self.draw_screen:
             pygame.display.flip()
-
-        import time
-        time.sleep(5)
-
-        print 'counter', self.counter
 
         return self._step(None)[0]
 
@@ -309,6 +307,7 @@ class ACar(gym.Env):
         max_distance = dist((width, height), (0, 0))
         distance = dist(self.target.get_position(), self.car.get_position())  # TODO: dist!!!
         last_distance = dist(self.target.get_position(), self.last_position)
+        t_distance = self.trajectory.distance(self.car.get_position())
         if self.crashed:
             if self.success:
                 r = 100.
@@ -316,6 +315,7 @@ class ACar(gym.Env):
                 r = -10.
         else:
             r = -0.1 + (last_distance-distance)/max_distance*10
+            # r = -0.1 + (last_distance-distance)/max_distance*10 - t_distance/max_distance*10
         return r
 
     def _move_dynamic(self):
