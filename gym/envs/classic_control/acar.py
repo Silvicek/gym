@@ -1,3 +1,6 @@
+"""
+The 'autonomous vehicles' environment.
+"""
 import gym
 from gym import spaces
 from gym.utils import colorize, seeding
@@ -27,6 +30,9 @@ CT_CAR = 0
 
 
 class Shape:
+    """
+    Used for handling obstacles, car and target
+    """
     def __init__(self, space, r=30, x=50, y=height - 100, angle=0.5, color='orange',
                  static=True, collision_type=CT_STATIC):
         self.r = r
@@ -50,8 +56,8 @@ class ACar(gym.Env):
     }
 
     def __init__(self):
-        pass
         # moved to configure - necessary for not drawing a window
+        pass
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -62,7 +68,7 @@ class ACar(gym.Env):
         self.action_dim = 3
         self.observation_dim = 5
         self.old_action = None
-        if args.mode == 'train' or args.mode == 'test':
+        if args.mode == 'train' or args.mode == 'test':  # Turn off visuals
             os.environ["SDL_VIDEODRIVER"] = "dummy"
             self.show_sensors = False
             self.draw_screen = False
@@ -121,13 +127,13 @@ class ACar(gym.Env):
             s.color = THECOLORS['red']
         self.space.add(static)
 
-        # Create some obstacles, semi-randomly.
-        # We'll create three and they'll move around to prevent over-fitting.
+        # Create some obstacles
         self.obstacles = []
         self.obstacles.append(Shape(self.space, r=55, x=25, y=350, color='purple'))
         self.obstacles.append(Shape(self.space, r=95, x=250, y=550, color='purple'))
         self.target = Shape(self.space, r=10, x=600, y=60, color='orange', collision_type=CT_TARGET)
 
+        # state = [o_{t} | a_{t-1} | o_{t-1}]
         self.state_dim = self.observation_dim + self.memory_steps * \
                                                 (self.observation_dim + self.action_dim)
 
@@ -153,15 +159,14 @@ class ACar(gym.Env):
         self.car.body.angle += .2 * (left+right)
 
         # Move dynamic objects
-        if self.num_steps % 5 == 0:
-            self._move_dynamic()
+        # if self.num_steps % 5 == 0:
+        #     self._move_dynamic()
 
         driving_direction = Vec2d(1, 0).rotated(self.car.body.angle)
         self.car.body.velocity = int(100 * go) * driving_direction
 
         # Update the screen and stuff.
         self.space.step(1. / 10)
-
         self.screen.fill(THECOLORS["black"])
         draw(self.screen, self.space)
         if self.draw_screen:
@@ -170,13 +175,13 @@ class ACar(gym.Env):
 
         # Get the current location and the readings there.
         x, y = self.car.body.position
-        xt, yt = self.target.body.position
 
         readings = self._get_sonar_readings(x, y, self.car.body.angle)
-        distance = np.sqrt((x-xt)**2+(y-yt)**2)/100.
+        distance = dist(self.car.body.position, self.target.body.position)/100.
         readings += [self._get_angle(), distance]
         state = np.array(readings)
 
+        # detect end of the episode
         if self.crashed or self._out_of_bounds():
             if self.num_steps == 0:
                 self.reset()
@@ -188,6 +193,7 @@ class ACar(gym.Env):
 
         r = self.get_reward(action)
 
+        # handle the full state shifts
         if self.memory_steps > 0:
             self.full_state = shift(self.full_state, self.action_dim+self.observation_dim)
             self.full_state[self.observation_dim:self.observation_dim+self.action_dim] = \
@@ -211,7 +217,7 @@ class ACar(gym.Env):
         for shape in self.obstacles + [self.car, self.target] + self.dynamic:
             shape.body.velocity = Vec2d(0, 0)
             shape.body.angle = np.random.random() * 2 * np.pi
-            while True:
+            while True:  # prevent creating overlapping objects
                 shape.body.position = np.random.randint(0, width), np.random.randint(0, height)
                 ok = True
                 for x in placed:
@@ -221,14 +227,6 @@ class ACar(gym.Env):
                 if ok:
                     break
             placed.append(shape)
-
-        # self.car.body.position = 100, 100
-        # self.car.body.velocity = Vec2d(0, 0)
-        # self.car.body.angle = 0
-        #
-        # self.target.body.position = 500, 500
-        # self.target.body.velocity = Vec2d(0, 0)
-        # self.target.angle = 0
 
         return self._step(None)[0]
 
@@ -260,16 +258,16 @@ class ACar(gym.Env):
 
     def _render(self, mode='human', close=False):
         # TODO: this
-
         arr = None
-
         if mode == 'rgb_array':
             screen = pygame.display.get_surface()
             arr = np.array(screen.get_buffer()).reshape((height, width, -1))
-
         return arr
 
     def get_reward(self, action):
+        """
+        Return reward for each step
+        """
         r = 0
         max_distance = dist((width, height), (0., 0.))
         distance = dist(self.target.body.position, self.car.body.position)
@@ -379,24 +377,11 @@ def dist(a, b):
     return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
 
-def norm_pi(angle):
+def norm_pi(angle):  # norm pi [-pi, pi]
     return angle - 2*np.pi*np.floor((angle + np.pi) / (2*np.pi))
 
-if __name__=="__main__":
-    from pyglet.window import key
-    a = np.array( [1.0, 0.0, 0.0] )
-    def key_press(k, mod):
-        global restart
-        if k==0xff0d: restart = True
-        if k==key.LEFT:  a[0] = -1.0
-        if k==key.RIGHT: a[0] = +1.0
-        if k==key.UP:    a[1] = +1.0
-        if k==key.DOWN:  a[2] = +0.8   # set 1.0 for wheels to block to zero rotation
-    def key_release(k, mod):
-        if k==key.LEFT  and a[0]==-1.0: a[0] = 0
-        if k==key.RIGHT and a[0]==+1.0: a[0] = 0
-        if k==key.UP:    a[1] = 0
-        if k==key.DOWN:  a[2] = 0
+if __name__ == "__main__":
+    a = np.array([1.0, 0.0, 0.0])
     env = ACar()
     env.render()
     record_video = False
