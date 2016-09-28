@@ -204,8 +204,8 @@ class ACar(gym.Env):
             self.full_state = state
 
         self.old_action = action
-
-        return state, r, self.crashed, {}
+        done = self.crashed
+        return state, r, done, {'success': self.success}
 
     def _reset(self):
         self.crashed = False
@@ -233,7 +233,7 @@ class ACar(gym.Env):
     def _crash_handler(self, space, arbiter):
         self.crashed = True
         self.success = False
-        return False
+        return True
 
     def _crash_handler_target(self, space, arbiter):
         self.crashed = True
