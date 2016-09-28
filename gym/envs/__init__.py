@@ -72,7 +72,13 @@ register(
 
 register(
     id='ACar-v0',
-    entry_point='gym.envs.classic_control:ACar',
+    entry_point='gym.envs.autonomous_vehicles:ACar',
+    timestep_limit=2000,
+)
+
+register(
+    id='ACarMaze-v0',
+    entry_point='gym.envs.autonomous_vehicles:ACarMaze',
     timestep_limit=2000,
 )
 
