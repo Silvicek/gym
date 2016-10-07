@@ -231,6 +231,7 @@ class ACarMaze(gym.Env):
 
     def _reset(self):
         self.crashed = False
+        self.success = False
         self.num_steps = 0
         self.full_state = np.zeros_like(self.full_state)
 
