@@ -50,7 +50,7 @@ class Shape:
 
 
 starting_pos_car = (50,50)
-starting_pos_target = (50,600)
+starting_pos_target = (500,50)
 
 
 class ACarMaze(gym.Env):
@@ -148,7 +148,6 @@ class ACarMaze(gym.Env):
 
         self.full_state = np.zeros(self.state_dim)
 
-
     def create_maze(self):
         walls = [
             pymunk.Segment(self.space.static_body, (0, 175), (width-200, 175), 5),
@@ -231,11 +230,12 @@ class ACarMaze(gym.Env):
 
     def _reset(self):
         self.crashed = False
+        self.success = False
         self.num_steps = 0
         self.full_state = np.zeros_like(self.full_state)
 
         self.car.body.position = starting_pos_car
-        self.car.body.angle = 0.
+        self.car.body.angle = np.random.random() * np.pi
         # self.target.body.position = starting_pos_target
 
         return self._step(None)[0]
@@ -286,9 +286,9 @@ class ACarMaze(gym.Env):
             if self.success:
                 r = 100.
             else:
-                r = -10.
+                r = -100.
         else:
-            r = -0.1 + (last_distance-distance)/max_distance*10
+            r = .1 - distance/max_distance
         return r
 
     def _move_dynamic(self):
