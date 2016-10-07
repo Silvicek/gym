@@ -50,7 +50,7 @@ class Shape:
 
 
 starting_pos_car = (50,50)
-starting_pos_target = (50,600)
+starting_pos_target = (900,60)
 
 
 class ACarMaze(gym.Env):
@@ -235,7 +235,7 @@ class ACarMaze(gym.Env):
         self.full_state = np.zeros_like(self.full_state)
 
         self.car.body.position = starting_pos_car
-        self.car.body.angle = 0.
+        self.car.body.angle = np.random.random() * 2*np.pi
         # self.target.body.position = starting_pos_target
 
         return self._step(None)[0]
